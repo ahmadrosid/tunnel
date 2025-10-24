@@ -17,15 +17,12 @@ type Server struct {
 	sshConfig *ssh.ServerConfig
 }
 
-// NewServer creates a new SSH server
 func NewServer(cfg *config.Config, registry *tunnel.Registry) (*Server, error) {
-	// Load or generate host key
 	hostKey, err := LoadOrGenerateHostKey(cfg.HostKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load host key: %w", err)
 	}
 
-	// Configure SSH server with anonymous auth
 	sshConfig := &ssh.ServerConfig{
 		NoClientAuth: true, // Allow anonymous connections
 	}
@@ -60,9 +57,7 @@ func (s *Server) Start() error {
 	}
 }
 
-// handleConnection handles an incoming SSH connection
 func (s *Server) handleConnection(netConn net.Conn) {
-	// Perform SSH handshake
 	sshConn, chans, reqs, err := ssh.NewServerConn(netConn, s.sshConfig)
 	if err != nil {
 		log.Printf("Failed to handshake: %v", err)
@@ -72,11 +67,9 @@ func (s *Server) handleConnection(netConn net.Conn) {
 
 	log.Printf("New SSH connection from %s (user: %s)", sshConn.RemoteAddr(), sshConn.User())
 
-	// Handle global requests (like remote forwarding) and channels
 	go s.handleRequests(reqs, sshConn)
 	go s.handleChannels(chans, sshConn)
 
-	// Wait for connection to close
 	sshConn.Wait()
 	log.Printf("Connection closed: %s", sshConn.RemoteAddr())
 }

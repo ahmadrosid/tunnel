@@ -28,13 +28,11 @@ func LoadOrGenerateHostKey(keyPath string) (ssh.Signer, error) {
 		return private, nil
 	}
 
-	// Generate new key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate host key: %w", err)
 	}
 
-	// Convert to SSH format
 	private, err := ssh.NewSignerFromKey(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signer: %w", err)
