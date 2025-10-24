@@ -44,7 +44,7 @@ func NewServer(cfg *config.Config, registry *tunnel.Registry) *Server {
 		s.httpsServer = &http.Server{
 			Addr:         fmt.Sprintf(":%d", cfg.HTTPSPort),
 			Handler:      http.HandlerFunc(s.handleHTTP),
-			TLSConfig:    s.certManager.GetTLSConfig(),
+			TLSConfig:    s.certManager.GetTLSConfigForHijacking(),
 			ReadTimeout:  cfg.RequestTimeout,
 			WriteTimeout: cfg.RequestTimeout,
 		}

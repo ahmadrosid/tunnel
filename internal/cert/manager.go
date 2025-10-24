@@ -50,6 +50,17 @@ func (m *Manager) GetTLSConfig() *tls.Config {
 	return m.autocertManager.TLSConfig()
 }
 
+// GetTLSConfigForHijacking returns a TLS configuration with HTTP/2 disabled
+// This is required for connection hijacking to work properly.
+// HTTP/2 doesn't support hijacking, so we force HTTP/1.1.
+func (m *Manager) GetTLSConfigForHijacking() *tls.Config {
+	// Clone the config to avoid mutating the shared instance
+	cfg := m.autocertManager.TLSConfig().Clone()
+	// Disable HTTP/2 by only allowing HTTP/1.1
+	cfg.NextProtos = []string{"http/1.1"}
+	return cfg
+}
+
 // HTTPHandler returns HTTP handler for ACME HTTP-01 challenge
 func (m *Manager) HTTPHandler() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

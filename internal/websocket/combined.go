@@ -20,6 +20,8 @@ type CombinedServer struct {
 	registry    *tunnel.Registry
 	certManager interface {
 		GetTLSConfig() *tls.Config
+		GetTLSConfigForHijacking() *tls.Config
+		HTTPHandler() func(http.Handler) http.Handler
 	}
 	server      *http.Server
 	httpServer  *http.Server
@@ -27,7 +29,11 @@ type CombinedServer struct {
 }
 
 // NewCombinedServer creates a combined server for WebSocket and HTTPS proxy
-func NewCombinedServer(cfg *config.Config, registry *tunnel.Registry, certManager interface{ GetTLSConfig() *tls.Config }) *CombinedServer {
+func NewCombinedServer(cfg *config.Config, registry *tunnel.Registry, certManager interface {
+	GetTLSConfig() *tls.Config
+	GetTLSConfigForHijacking() *tls.Config
+	HTTPHandler() func(http.Handler) http.Handler
+}) *CombinedServer {
 	cs := &CombinedServer{
 		config:      cfg,
 		registry:    registry,
@@ -51,9 +57,8 @@ func NewCombinedServer(cfg *config.Config, registry *tunnel.Registry, certManage
 	// All other requests go to the proxy
 	mux.HandleFunc("/", cs.handleProxyOrWebSocket)
 
-	// Get TLS config and disable HTTP/2 (required for connection hijacking)
-	tlsConfig := certManager.GetTLSConfig()
-	tlsConfig.NextProtos = []string{"http/1.1"} // Force HTTP/1.1, disable HTTP/2
+	// Get TLS config with HTTP/2 disabled (required for connection hijacking)
+	tlsConfig := certManager.GetTLSConfigForHijacking()
 
 	// HTTPS server on 443
 	cs.server = &http.Server{
@@ -70,7 +75,7 @@ func NewCombinedServer(cfg *config.Config, registry *tunnel.Registry, certManage
 
 	cs.httpServer = &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.HTTPPort),
-		Handler:      certManager.(interface{ HTTPHandler() func(http.Handler) http.Handler }).HTTPHandler()(httpMux),
+		Handler:      certManager.HTTPHandler()(httpMux),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 	}
@@ -111,8 +116,13 @@ func (cs *CombinedServer) Shutdown(ctx context.Context) error {
 
 // handleProxyOrWebSocket routes requests to either WebSocket or proxy
 func (cs *CombinedServer) handleProxyOrWebSocket(w http.ResponseWriter, r *http.Request) {
-	// Check if it's a WebSocket upgrade request
-	if r.Header.Get("Upgrade") == "websocket" {
+	// Check if it's a WebSocket upgrade request (RFC 6455 compliant)
+	// Headers are case-insensitive per HTTP spec
+	upgrade := r.Header.Get("Upgrade")
+	connection := r.Header.Get("Connection")
+
+	if strings.EqualFold(upgrade, "websocket") &&
+	   strings.Contains(strings.ToLower(connection), "upgrade") {
 		cs.wsHandler.handleWebSocket(w, r)
 		return
 	}

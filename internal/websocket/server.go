@@ -42,11 +42,15 @@ type Server struct {
 	server      *http.Server
 	certManager interface {
 		GetTLSConfig() *tls.Config
+		GetTLSConfigForHijacking() *tls.Config
 	}
 }
 
 // NewServer creates a new WebSocket server
-func NewServer(cfg *config.Config, registry *tunnel.Registry, certManager interface{ GetTLSConfig() *tls.Config }) *Server {
+func NewServer(cfg *config.Config, registry *tunnel.Registry, certManager interface {
+	GetTLSConfig() *tls.Config
+	GetTLSConfigForHijacking() *tls.Config
+}) *Server {
 	s := &Server{
 		config:      cfg,
 		registry:    registry,
@@ -65,8 +69,9 @@ func NewServer(cfg *config.Config, registry *tunnel.Registry, certManager interf
 	}
 
 	// Add TLS config if HTTPS is enabled
+	// Use GetTLSConfigForHijacking to disable HTTP/2 (required for connection hijacking)
 	if cfg.EnableHTTPS && certManager != nil {
-		s.server.TLSConfig = certManager.GetTLSConfig()
+		s.server.TLSConfig = certManager.GetTLSConfigForHijacking()
 	}
 
 	return s
