@@ -8,15 +8,18 @@ import (
 )
 
 // DialThroughTunnel creates a connection through a WebSocket tunnel
+// Returns a VirtualConnection that wraps the WebSocket connection.
+// The VirtualConnection can be safely closed without affecting the underlying WebSocket,
+// allowing multiple HTTP requests to be handled over the same persistent tunnel.
 func DialThroughTunnel(tun *tunnel.Tunnel) (tunnel.Connection, error) {
 	// Check if WebSocket connection is still alive
 	if tun.WSConn == nil {
 		return nil, fmt.Errorf("WebSocket connection is nil")
 	}
 
-	// The WebSocket connection is already established and ready to use
-	// No need to open a new channel like in SSH
-	return tun.WSConn, nil
+	// Return a virtual connection wrapper
+	// This allows the proxy to call Close() without killing the WebSocket
+	return NewVirtualConnection(tun.WSConn), nil
 }
 
 // CopyBidirectional copies data bidirectionally between two connections
