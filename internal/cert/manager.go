@@ -23,7 +23,13 @@ func NewManager(cfg *config.Config) *Manager {
 		Prompt: autocert.AcceptTOS,
 		Cache:  autocert.DirCache(cfg.CertCacheDir),
 		HostPolicy: func(ctx context.Context, host string) error {
-			// Allow all subdomains of the configured domain
+			// Reject localhost, IPs, and invalid hostnames
+			if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "" {
+				return fmt.Errorf("certificates not supported for %s", host)
+			}
+
+			// Allow the base domain and all subdomains
+			// This prevents the "server name component count invalid" error
 			return nil
 		},
 	}

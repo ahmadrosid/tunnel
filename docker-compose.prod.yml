@@ -35,11 +35,11 @@ services:
     networks:
       - tunnel-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "https://localhost:443/health", "--no-check-certificate"]
+      test: ["CMD", "nc", "-z", "localhost", "443"]
       interval: 30s
       timeout: 3s
       retries: 3
-      start_period: 10s
+      start_period: 20s
     logging:
       driver: "json-file"
       options:
