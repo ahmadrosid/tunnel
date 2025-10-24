@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tunnel Client - Browser Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .tunnel-info {
+            margin-top: 10px;
+        }
+
+        .tunnel-info a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .tunnel-info a:hover {
+            text-decoration: underline;
+        }
+
+        .code {
+            background: #f5f5f5;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            margin: 8px 0;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Tunnel Client</h1>
+
+        <div class="form-group">
+            <label for="server">Tunnel Server</label>
+            <input type="text" id="server" value="ws://localhost:8080/tunnel" placeholder="ws://your-domain.com:8080/tunnel">
+        </div>
+
+        <div class="form-group">
+            <label for="subdomain">Subdomain (leave empty for random)</label>
+            <input type="text" id="subdomain" placeholder="myapp">
+        </div>
+
+        <div class="form-group">
+            <label for="localPort">Local Port</label>
+            <input type="number" id="localPort" value="3000" placeholder="3000">
+        </div>
+
+        <button id="connectBtn" onclick="connect()">Connect</button>
+        <button id="disconnectBtn" onclick="disconnect()" style="display: none; background: #dc3545;">Disconnect</button>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        let ws = null;
+
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = message;
+            statusDiv.style.display = 'block';
+        }
+
+        function connect() {
+            const server = document.getElementById('server').value;
+            const subdomain = document.getElementById('subdomain').value;
+            const localPort = document.getElementById('localPort').value;
+
+            if (!server) {
+                showStatus('❌ Please enter a tunnel server URL', 'error');
+                return;
+            }
+
+            showStatus('⏳ Connecting to tunnel server...', 'info');
+
+            try {
+                ws = new WebSocket(server);
+
+                ws.onopen = () => {
+                    showStatus('✅ Connected! Registering tunnel...', 'info');
+
+                    // Register tunnel
+                    const registerMsg = {
+                        type: 'register',
+                        timestamp: new Date().toISOString(),
+                        data: {
+                            subdomain: subdomain,
+                            local_addr: `localhost:${localPort}`,
+                            local_port: parseInt(localPort)
+                        }
+                    };
+
+                    ws.send(JSON.stringify(registerMsg));
+
+                    document.getElementById('connectBtn').style.display = 'none';
+                    document.getElementById('disconnectBtn').style.display = 'block';
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const msg = JSON.parse(event.data);
+
+                        if (msg.type === 'success') {
+                            const info = msg.data;
+                            showStatus(`
+                                ✨ <strong>Tunnel created successfully!</strong><br><br>
+                                <div class="tunnel-info">
+                                    🌐 <strong>Public URL:</strong><br>
+                                    <div class="code"><a href="https://${info.full_domain}" target="_blank">https://${info.full_domain}</a></div>
+                                    📌 <strong>Subdomain:</strong> ${info.subdomain}<br>
+                                    🔗 <strong>Forwarding to:</strong> ${info.local_addr}<br><br>
+                                    <em>Note: This is a demo client. For production use, implement proper HTTP request forwarding.</em>
+                                </div>
+                            `, 'success');
+                        } else if (msg.type === 'error') {
+                            showStatus(`❌ Error: ${msg.error}`, 'error');
+                            disconnect();
+                        }
+                    } catch (err) {
+                        // Binary data - would need to forward to local server
+                        console.log('Received binary data (HTTP traffic)');
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    showStatus(`❌ Connection error: ${error.message || 'Unknown error'}`, 'error');
+                };
+
+                ws.onclose = () => {
+                    showStatus('👋 Disconnected from tunnel server', 'info');
+                    document.getElementById('connectBtn').style.display = 'block';
+                    document.getElementById('disconnectBtn').style.display = 'none';
+                };
+            } catch (error) {
+                showStatus(`❌ Failed to connect: ${error.message}`, 'error');
+            }
+        }
+
+        function disconnect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'unregister',
+                    timestamp: new Date().toISOString()
+                }));
+                ws.close();
+            }
+        }
+
+        // Keep connection alive with ping
+        setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'ping',
+                    timestamp: new Date().toISOString()
+                }));
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

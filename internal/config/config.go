@@ -8,25 +8,23 @@ import (
 
 // Config holds the server configuration
 type Config struct {
-	SSHPort           int
-	Domain            string
-	HTTPPort          int
-	HTTPSPort         int
-	HostKeyPath       string
-	CertCacheDir      string
-	LetsEncryptEmail  string
-	RequestTimeout    time.Duration
-	EnableHTTPS       bool
+	WebSocketPort    int
+	Domain           string
+	HTTPPort         int
+	HTTPSPort        int
+	CertCacheDir     string
+	LetsEncryptEmail string
+	RequestTimeout   time.Duration
+	EnableHTTPS      bool
 }
 
 // Load reads configuration from environment variables with defaults
 func Load() *Config {
 	return &Config{
-		SSHPort:          getEnvAsInt("SSH_PORT", 2222),
-		Domain:           getEnv("DOMAIN", "unggahin.com"),
+		WebSocketPort:    getEnvAsInt("WS_PORT", 8080),
+		Domain:           getEnv("DOMAIN", "easypod.cloud"),
 		HTTPPort:         getEnvAsInt("HTTP_PORT", 80),
 		HTTPSPort:        getEnvAsInt("HTTPS_PORT", 443),
-		HostKeyPath:      getEnv("HOST_KEY_PATH", "./ssh_host_key"),
 		CertCacheDir:     getEnv("CERT_CACHE_DIR", "./certs"),
 		LetsEncryptEmail: getEnv("LETSENCRYPT_EMAIL", ""),
 		RequestTimeout:   getEnvAsDuration("REQUEST_TIMEOUT", 30*time.Second),

@@ -5,7 +5,7 @@ This guide explains how to deploy the tunnel server and publish Docker images to
 ## Prerequisites
 
 1. GitHub repository: `github.com/ahmadrosid/tunnel`
-2. DNS wildcard record configured (e.g., `*.unggahin.com`)
+2. DNS wildcard record configured (e.g., `*.easypod.cloud`)
 3. Server with Docker installed
 4. Ports 22, 80, 443, and 2222 open
 
@@ -71,7 +71,7 @@ wget https://raw.githubusercontent.com/ahmadrosid/tunnel/main/docker-compose.pro
 
 # Create .env file
 cat > .env << EOF
-DOMAIN=unggahin.com
+DOMAIN=easypod.cloud
 LETSENCRYPT_EMAIL=your-email@example.com
 ENABLE_HTTPS=true
 EOF
@@ -92,7 +92,7 @@ docker run -d \
   -p 2222:2222 \
   -p 80:80 \
   -p 443:443 \
-  -e DOMAIN=unggahin.com \
+  -e DOMAIN=easypod.cloud \
   -e LETSENCRYPT_EMAIL=your-email@example.com \
   -e ENABLE_HTTPS=true \
   -v tunnel-keys:/home/tunnel \
@@ -129,7 +129,7 @@ spec:
           name: https
         env:
         - name: DOMAIN
-          value: "unggahin.com"
+          value: "easypod.cloud"
         - name: LETSENCRYPT_EMAIL
           value: "your-email@example.com"
         - name: ENABLE_HTTPS
@@ -266,11 +266,11 @@ docker logs tunnel-server
 docker logs tunnel-server | grep -i "acme\|certificate"
 
 # Verify DNS is correct
-dig unggahin.com
-dig test.unggahin.com
+dig easypod.cloud
+dig test.easypod.cloud
 
 # Check ports are accessible
-curl -I http://unggahin.com
+curl -I http://easypod.cloud
 ```
 
 ### High resource usage

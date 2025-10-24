@@ -1,4 +1,4 @@
-.PHONY: build run clean docker-build docker-run docker-stop test
+.PHONY: build run clean docker-build docker-run docker-stop test client-install client-run
 
 # Build the server binary
 build:
@@ -59,17 +59,30 @@ lint:
 	@echo "Running linter..."
 	@golangci-lint run ./... || echo "golangci-lint not installed"
 
+# Install client dependencies
+client-install:
+	@echo "Installing client dependencies..."
+	@cd client && npm install
+	@echo "Client dependencies installed"
+
+# Run the Node.js client
+client-run:
+	@echo "Starting tunnel client..."
+	@cd client && node client.js $(SUBDOMAIN) $(PORT)
+
 # Show help
 help:
 	@echo "Available targets:"
-	@echo "  build        - Build the server binary"
-	@echo "  run          - Build and run the server"
-	@echo "  clean        - Clean build artifacts"
-	@echo "  docker-build - Build Docker image"
-	@echo "  docker-run   - Run with docker-compose"
-	@echo "  docker-stop  - Stop docker-compose"
-	@echo "  test         - Run tests"
-	@echo "  deps         - Install dependencies"
-	@echo "  fmt          - Format code"
-	@echo "  lint         - Run linter"
-	@echo "  help         - Show this help message"
+	@echo "  build         - Build the server binary"
+	@echo "  run           - Build and run the server"
+	@echo "  clean         - Clean build artifacts"
+	@echo "  docker-build  - Build Docker image"
+	@echo "  docker-run    - Run with docker-compose"
+	@echo "  docker-stop   - Stop docker-compose"
+	@echo "  test          - Run tests"
+	@echo "  deps          - Install dependencies"
+	@echo "  fmt           - Format code"
+	@echo "  lint          - Run linter"
+	@echo "  client-install - Install client dependencies"
+	@echo "  client-run    - Run client (use: make client-run SUBDOMAIN=myapp PORT=3000)"
+	@echo "  help          - Show this help message"

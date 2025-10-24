@@ -4,16 +4,21 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
-	"golang.org/x/crypto/ssh"
 )
+
+// Connection represents a generic connection interface
+type Connection interface {
+	Read([]byte) (int, error)
+	Write([]byte) (int, error)
+	Close() error
+}
 
 type Tunnel struct {
 	ID         string
 	Subdomain  string
-	SSHConn    ssh.Conn
-	LocalAddr  string // e.g., "localhost:3000"
-	RemotePort int    // e.g., 80 or 443
+	WSConn     Connection // WebSocket connection
+	LocalAddr  string     // e.g., "localhost:3000"
+	RemotePort int        // e.g., 80 or 443
 	CreatedAt  time.Time
 }
 

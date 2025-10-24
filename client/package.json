@@ -1,0 +1,22 @@
+{
+  "name": "tunnel-client",
+  "version": "1.0.0",
+  "description": "WebSocket tunneling client for exposing local servers to the internet",
+  "main": "client.js",
+  "scripts": {
+    "start": "node client.js"
+  },
+  "keywords": [
+    "tunnel",
+    "websocket",
+    "ngrok",
+    "localtunnel",
+    "port-forwarding"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.0",
+    "dotenv": "^16.3.1"
+  }
+}

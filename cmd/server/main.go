@@ -10,8 +10,8 @@ import (
 
 	"github.com/ahmadrosid/tunnel/internal/config"
 	"github.com/ahmadrosid/tunnel/internal/proxy"
-	sshserver "github.com/ahmadrosid/tunnel/internal/ssh"
 	"github.com/ahmadrosid/tunnel/internal/tunnel"
+	"github.com/ahmadrosid/tunnel/internal/websocket"
 )
 
 func main() {
@@ -19,17 +19,14 @@ func main() {
 
 	// Load configuration
 	cfg := config.Load()
-	log.Printf("Configuration loaded: SSH Port=%d, Domain=%s, HTTP Port=%d, HTTPS Port=%d",
-		cfg.SSHPort, cfg.Domain, cfg.HTTPPort, cfg.HTTPSPort)
+	log.Printf("Configuration loaded: WebSocket Port=%d, Domain=%s, HTTP Port=%d, HTTPS Port=%d",
+		cfg.WebSocketPort, cfg.Domain, cfg.HTTPPort, cfg.HTTPSPort)
 
 	// Create tunnel registry
 	registry := tunnel.NewRegistry()
 
-	// Create SSH server
-	sshServer, err := sshserver.NewServer(cfg, registry)
-	if err != nil {
-		log.Fatalf("Failed to create SSH server: %v", err)
-	}
+	// Create WebSocket server
+	wsServer := websocket.NewServer(cfg, registry)
 
 	// Create HTTP/HTTPS proxy server
 	proxyServer := proxy.NewServer(cfg, registry)
@@ -45,10 +42,10 @@ func main() {
 		}
 	}()
 
-	// Start SSH server in a goroutine
+	// Start WebSocket server in a goroutine
 	go func() {
-		if err := sshServer.Start(); err != nil {
-			log.Fatalf("SSH server error: %v", err)
+		if err := wsServer.Start(); err != nil {
+			log.Fatalf("WebSocket server error: %v", err)
 		}
 	}()
 
@@ -62,6 +59,10 @@ func main() {
 
 	if err := proxyServer.Shutdown(ctx); err != nil {
 		log.Printf("Error during proxy shutdown: %v", err)
+	}
+
+	if err := wsServer.Shutdown(); err != nil {
+		log.Printf("Error during WebSocket shutdown: %v", err)
 	}
 
 	log.Println("Server stopped")

@@ -3,49 +3,20 @@ package proxy
 import (
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/ahmadrosid/tunnel/internal/tunnel"
-	"golang.org/x/crypto/ssh"
 )
 
-// DialThroughTunnel creates a connection through an SSH tunnel
-func DialThroughTunnel(tun *tunnel.Tunnel) (ssh.Channel, error) {
-	// Check if SSH connection is still alive
-	if tun.SSHConn == nil {
-		return nil, fmt.Errorf("SSH connection is nil")
+// DialThroughTunnel creates a connection through a WebSocket tunnel
+func DialThroughTunnel(tun *tunnel.Tunnel) (tunnel.Connection, error) {
+	// Check if WebSocket connection is still alive
+	if tun.WSConn == nil {
+		return nil, fmt.Errorf("WebSocket connection is nil")
 	}
 
-	// Create forwarded-tcpip request for reverse port forwarding
-	// This tells the SSH client "here's a connection for the port you asked me to forward"
-	// The client will then forward it according to its -R configuration
-	type forwardedTCPIPMsg struct {
-		ConnectedAddr string
-		ConnectedPort uint32
-		OriginAddr    string
-		OriginPort    uint32
-	}
-
-	// Use empty string for ConnectedAddr and the RemotePort
-	// The SSH client knows where to forward based on its -R configuration
-	payload := ssh.Marshal(forwardedTCPIPMsg{
-		ConnectedAddr: "",
-		ConnectedPort: uint32(tun.RemotePort),
-		OriginAddr:    "proxy",
-		OriginPort:    uint32(tun.RemotePort),
-	})
-
-	// Open a forwarded-tcpip channel (for reverse port forwarding)
-	channel, reqs, err := tun.SSHConn.OpenChannel("forwarded-tcpip", payload)
-	if err != nil {
-		log.Printf("Failed to open channel through tunnel %s: %v", tun.Subdomain, err)
-		return nil, fmt.Errorf("failed to connect to local server: %w", err)
-	}
-
-	// Discard all requests
-	go ssh.DiscardRequests(reqs)
-
-	return channel, nil
+	// The WebSocket connection is already established and ready to use
+	// No need to open a new channel like in SSH
+	return tun.WSConn, nil
 }
 
 // CopyBidirectional copies data bidirectionally between two connections
