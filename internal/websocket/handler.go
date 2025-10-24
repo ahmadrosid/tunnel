@@ -51,10 +51,11 @@ type RegisterResponse struct {
 
 // Handler handles WebSocket messages
 type Handler struct {
-	config   *config.Config
-	registry *tunnel.Registry
-	conn     *Connection
-	tunnelID string
+	config    *config.Config
+	registry  *tunnel.Registry
+	conn      *Connection
+	tunnelID  string
+	subdomain string
 }
 
 // NewHandler creates a new WebSocket handler
@@ -73,12 +74,9 @@ func (h *Handler) HandleMessages() error {
 		if err != nil {
 			log.Printf("Failed to read message: %v", err)
 			// Cleanup tunnel on disconnect
-			if h.tunnelID != "" {
-				tun, exists := h.registry.Get(h.tunnelID)
-				if exists {
-					h.registry.Unregister(tun.Subdomain)
-					log.Printf("Tunnel unregistered on disconnect: %s", tun.Subdomain)
-				}
+			if h.subdomain != "" {
+				h.registry.Unregister(h.subdomain)
+				log.Printf("Tunnel unregistered on disconnect: %s", h.subdomain)
 			}
 			return err
 		}
@@ -159,6 +157,7 @@ func (h *Handler) handleRegister(msg *Message) error {
 	}
 
 	h.tunnelID = tunnelID
+	h.subdomain = selectedSubdomain
 
 	// Send success response
 	fullDomain := fmt.Sprintf("%s.%s", selectedSubdomain, h.config.Domain)
@@ -177,19 +176,15 @@ func (h *Handler) handleRegister(msg *Message) error {
 
 // handleUnregister handles tunnel unregistration
 func (h *Handler) handleUnregister(msg *Message) error {
-	if h.tunnelID == "" {
+	if h.subdomain == "" {
 		return fmt.Errorf("no tunnel registered")
 	}
 
-	tun, exists := h.registry.Get(h.tunnelID)
-	if !exists {
-		return fmt.Errorf("tunnel not found")
-	}
-
-	h.registry.Unregister(tun.Subdomain)
-	log.Printf("Tunnel unregistered: %s", tun.Subdomain)
+	h.registry.Unregister(h.subdomain)
+	log.Printf("Tunnel unregistered: %s", h.subdomain)
 
 	h.tunnelID = ""
+	h.subdomain = ""
 
 	return h.sendSuccess(map[string]string{
 		"message": "Tunnel unregistered successfully",

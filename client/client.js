@@ -55,7 +55,14 @@ ws.on('open', () => {
   console.log('📤 Sent registration request...');
 });
 
-ws.on('message', (data) => {
+ws.on('message', (data, isBinary) => {
+  // Handle binary messages (HTTP traffic)
+  if (isBinary || data instanceof Buffer) {
+    handleHttpTraffic(data);
+    return;
+  }
+
+  // Handle text messages (control messages)
   try {
     const msg = JSON.parse(data.toString());
 
@@ -72,13 +79,13 @@ ws.on('message', (data) => {
       console.error(`❌ Error: ${msg.error}`);
       process.exit(1);
     } else if (msg.type === 'pong') {
-      // Ignore pong messages
+      // Pong received - connection is alive
+      console.log('🏓 Pong received');
     } else {
-      console.log(`📨 Received: ${msg.type}`);
+      console.log(`📨 Received message type: ${msg.type}`);
     }
   } catch (err) {
-    // Binary data - this is HTTP traffic to forward
-    handleHttpTraffic(data);
+    console.error(`❌ Failed to parse message: ${err.message}`);
   }
 });
 
@@ -93,50 +100,60 @@ ws.on('close', () => {
 
 // Handle incoming HTTP traffic from tunnel
 function handleHttpTraffic(data) {
-  // Forward the HTTP request to local server
-  const options = {
-    hostname: localHost,
-    port: localPort,
-    method: 'GET',
-    path: '/',
-    headers: {}
-  };
+  console.log(`📥 Received HTTP traffic (${data.length} bytes)`);
 
-  // Parse HTTP request (simplified - would need proper HTTP parsing in production)
-  const request = http.request(options, (response) => {
-    let responseData = '';
+  try {
+    // Forward the HTTP request to local server
+    const options = {
+      hostname: localHost,
+      port: localPort,
+      method: 'GET',
+      path: '/',
+      headers: {}
+    };
 
-    response.on('data', (chunk) => {
-      responseData += chunk;
+    // Parse HTTP request (simplified - would need proper HTTP parsing in production)
+    const request = http.request(options, (response) => {
+      let responseData = '';
+
+      response.on('data', (chunk) => {
+        responseData += chunk;
+      });
+
+      response.on('end', () => {
+        // Build HTTP response
+        const httpResponse = `HTTP/1.1 ${response.statusCode} ${response.statusMessage}\r\n`;
+        const headers = Object.entries(response.headers)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join('\r\n');
+        const fullResponse = `${httpResponse}${headers}\r\n\r\n${responseData}`;
+
+        // Send response back through tunnel
+        console.log(`📤 Sending response (${fullResponse.length} bytes)`);
+        ws.send(Buffer.from(fullResponse), { binary: true });
+      });
     });
 
-    response.on('end', () => {
-      // Build HTTP response
-      const httpResponse = `HTTP/1.1 ${response.statusCode} ${response.statusMessage}\r\n`;
-      const headers = Object.entries(response.headers)
-        .map(([key, value]) => `${key}: ${value}`)
-        .join('\r\n');
-      const fullResponse = `${httpResponse}${headers}\r\n\r\n${responseData}`;
+    request.on('error', (err) => {
+      console.error(`❌ Local server error: ${err.message}`);
 
-      // Send response back through tunnel
-      ws.send(Buffer.from(fullResponse), { binary: true });
+      // Send 502 Bad Gateway response
+      const errorResponse = 'HTTP/1.1 502 Bad Gateway\r\n' +
+                           'Content-Type: text/plain\r\n' +
+                           'Content-Length: 15\r\n\r\n' +
+                           'Bad Gateway\r\n';
+
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(Buffer.from(errorResponse), { binary: true });
+      }
     });
-  });
 
-  request.on('error', (err) => {
-    console.error(`❌ Local server error: ${err.message}`);
-
-    // Send 502 Bad Gateway response
-    const errorResponse = 'HTTP/1.1 502 Bad Gateway\r\n' +
-                         'Content-Type: text/plain\r\n' +
-                         'Content-Length: 15\r\n\r\n' +
-                         'Bad Gateway\r\n';
-    ws.send(Buffer.from(errorResponse), { binary: true });
-  });
-
-  // Forward the request
-  request.write(data);
-  request.end();
+    // Forward the request
+    request.write(data);
+    request.end();
+  } catch (err) {
+    console.error(`❌ Error handling HTTP traffic: ${err.message}`);
+  }
 }
 
 // Send ping every 30 seconds to keep connection alive
