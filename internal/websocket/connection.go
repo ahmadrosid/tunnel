@@ -11,11 +11,13 @@ import (
 
 // Connection wraps a WebSocket connection and provides helper methods
 type Connection struct {
-	conn          *websocket.Conn
-	mu            sync.Mutex
-	writeMu       sync.Mutex
-	closeOnce     sync.Once
-	currentReader io.Reader // For streaming reads of large messages
+	conn         *websocket.Conn
+	mu           sync.Mutex
+	writeMu      sync.Mutex
+	closeOnce    sync.Once
+	readBuffer   []byte   // Buffer for partial reads from binary messages
+	readOffset   int      // Current offset in readBuffer
+	binaryQueue  [][]byte // Queue of binary messages read by ReadMessage()
 }
 
 // NewConnection creates a new WebSocket connection wrapper
@@ -25,27 +27,40 @@ func NewConnection(conn *websocket.Conn) *Connection {
 	}
 }
 
-// ReadMessage reads a message from the WebSocket connection
+// ReadMessage reads a message from the WebSocket connection for control plane.
+// This method is used by HandleMessages() loop to read JSON control messages.
+// Binary messages are queued for Read() to consume, avoiding race conditions.
 func (c *Connection) ReadMessage() (*Message, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	for {
+		c.mu.Lock()
+		messageType, data, err := c.conn.ReadMessage()
 
-	messageType, data, err := c.conn.ReadMessage()
-	if err != nil {
-		return nil, err
+		if err != nil {
+			c.mu.Unlock()
+			return nil, err
+		}
+
+		// If it's a binary message, queue it for Read() and continue reading
+		if messageType == websocket.BinaryMessage {
+			c.binaryQueue = append(c.binaryQueue, data)
+			c.mu.Unlock()
+			continue
+		}
+
+		c.mu.Unlock()
+
+		// Only handle text messages for control plane
+		if messageType != websocket.TextMessage {
+			continue
+		}
+
+		var msg Message
+		if err := json.Unmarshal(data, &msg); err != nil {
+			return nil, err
+		}
+
+		return &msg, nil
 	}
-
-	// Only handle text messages for control plane
-	if messageType != websocket.TextMessage {
-		return nil, io.EOF
-	}
-
-	var msg Message
-	if err := json.Unmarshal(data, &msg); err != nil {
-		return nil, err
-	}
-
-	return &msg, nil
 }
 
 // WriteMessage writes a message to the WebSocket connection
@@ -117,42 +132,68 @@ func (c *Connection) Conn() *websocket.Conn {
 }
 
 // Read implements io.Reader interface for bidirectional copying
-// Uses NextReader to properly handle large messages that may be larger than the read buffer
+// Reads binary WebSocket messages and buffers them for io.Copy operations
 func (c *Connection) Read(p []byte) (n int, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// If we don't have a current reader, get the next message
-	if c.currentReader == nil {
-		var messageType int
-		messageType, c.currentReader, err = c.conn.NextReader()
-		if err != nil {
-			return 0, err
+	// If we have buffered data, return it first
+	if c.readOffset < len(c.readBuffer) {
+		n = copy(p, c.readBuffer[c.readOffset:])
+		c.readOffset += n
+
+		// If we've consumed the entire buffer, clear it
+		if c.readOffset >= len(c.readBuffer) {
+			c.readBuffer = nil
+			c.readOffset = 0
 		}
 
-		// Only handle binary messages for data transfer
-		if messageType != websocket.BinaryMessage {
-			c.currentReader = nil
-			return 0, io.EOF
-		}
+		return n, nil
 	}
 
-	// Read from the current message reader
-	n, err = c.currentReader.Read(p)
+	// Check if there are queued binary messages from ReadMessage()
+	if len(c.binaryQueue) > 0 {
+		c.readBuffer = c.binaryQueue[0]
+		c.binaryQueue = c.binaryQueue[1:]
+		c.readOffset = 0
 
-	// If we've finished reading this message, clear the reader
-	if err == io.EOF {
-		c.currentReader = nil
-		// Don't propagate EOF to the caller; just indicate we read 0 bytes
-		// The caller will call Read again for the next message
-		if n == 0 {
-			err = nil
-		} else {
-			err = nil
+		// Copy as much as we can to the caller's buffer
+		n = copy(p, c.readBuffer)
+		c.readOffset = n
+
+		// If we didn't consume everything, keep the buffer for next Read()
+		if c.readOffset >= len(c.readBuffer) {
+			c.readBuffer = nil
+			c.readOffset = 0
 		}
+
+		return n, nil
 	}
 
-	return n, err
+	// No buffered or queued data, read next WebSocket message
+	var messageType int
+	messageType, c.readBuffer, err = c.conn.ReadMessage()
+	if err != nil {
+		return 0, err
+	}
+
+	// Only handle binary messages for data transfer
+	if messageType != websocket.BinaryMessage {
+		c.readBuffer = nil
+		return 0, io.EOF
+	}
+
+	// Copy as much as we can to the caller's buffer
+	n = copy(p, c.readBuffer)
+	c.readOffset = n
+
+	// If we didn't consume everything, keep the buffer for next Read()
+	if c.readOffset >= len(c.readBuffer) {
+		c.readBuffer = nil
+		c.readOffset = 0
+	}
+
+	return n, nil
 }
 
 // Write implements io.Writer interface for bidirectional copying
