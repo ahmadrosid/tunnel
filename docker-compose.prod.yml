@@ -11,7 +11,6 @@ services:
     env_file:
       - .env
     ports:
-      - "8080:8080"
       - "80:80"
       - "443:443"
     environment:
@@ -22,7 +21,8 @@ services:
       - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL:-}
 
       # Server configuration
-      - WS_PORT=8080
+      # WebSocket runs on port 443 (WSS) - same as HTTPS
+      - WS_PORT=443
       - HTTP_PORT=80
       - HTTPS_PORT=443
       - ENABLE_HTTPS=${ENABLE_HTTPS:-true}
@@ -36,7 +36,7 @@ services:
     networks:
       - tunnel-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "https://localhost:443/health", "--no-check-certificate"]
       interval: 30s
       timeout: 3s
       retries: 3
