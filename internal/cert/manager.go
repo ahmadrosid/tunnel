@@ -19,6 +19,11 @@ type Manager struct {
 
 // NewManager creates a new certificate manager
 func NewManager(cfg *config.Config) *Manager {
+	// Create registry reference for validation (will be set later)
+	manager := &Manager{
+		config: cfg,
+	}
+
 	m := &autocert.Manager{
 		Prompt: autocert.AcceptTOS,
 		Cache:  autocert.DirCache(cfg.CertCacheDir),
@@ -28,8 +33,16 @@ func NewManager(cfg *config.Config) *Manager {
 				return fmt.Errorf("certificates not supported for %s", host)
 			}
 
-			// Allow the base domain and all subdomains
-			// This prevents the "server name component count invalid" error
+			// Allow the base domain
+			if host == cfg.Domain {
+				log.Printf("Certificate requested for base domain: %s", host)
+				return nil
+			}
+
+			// For subdomains, log the request
+			// Note: We allow all subdomains because we can't check tunnel registry here
+			// The proxy layer will return 404 if tunnel doesn't exist
+			log.Printf("Certificate requested for: %s", host)
 			return nil
 		},
 	}
@@ -39,10 +52,8 @@ func NewManager(cfg *config.Config) *Manager {
 		m.Email = cfg.LetsEncryptEmail
 	}
 
-	return &Manager{
-		autocertManager: m,
-		config:          cfg,
-	}
+	manager.autocertManager = m
+	return manager
 }
 
 // GetTLSConfig returns a TLS configuration for HTTPS server
