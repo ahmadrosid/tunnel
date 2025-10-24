@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  tunnel-server:
+    # Use GHCR image by default, or build locally if IMAGE is not set
+    image: ${IMAGE:-ghcr.io/ahmadrosid/tunnel:latest}
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-dev}
+        COMMIT: ${COMMIT:-local}
+    container_name: tunnel-server
+    ports:
+      - "2222:2222"  # SSH port
+      - "80:80"      # HTTP port
+      - "443:443"    # HTTPS port
+    environment:
+      - SSH_PORT=2222
+      - DOMAIN=${DOMAIN:-unggahin.com}
+      - HTTP_PORT=80
+      - HTTPS_PORT=443
+      - ENABLE_HTTPS=${ENABLE_HTTPS:-true}
+      - HOST_KEY_PATH=/home/tunnel/ssh_host_key
+      - CERT_CACHE_DIR=/home/tunnel/certs
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL:-}
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-30s}
+    volumes:
+      - tunnel-ssh-keys:/home/tunnel/ssh_host_key  # Persist SSH host key
+      - tunnel-certs:/home/tunnel/certs             # Persist SSL certificates
+    restart: unless-stopped
+    networks:
+      - tunnel-network
+    healthcheck:
+      test: ["CMD", "netstat", "-an", "|", "grep", "2222"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+networks:
+  tunnel-network:
+    driver: bridge
+
+volumes:
+  tunnel-ssh-keys:
+    driver: local
+  tunnel-certs:
+    driver: local

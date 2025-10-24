@@ -1,0 +1,59 @@
+# Binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+*.test
+*.out
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Documentation
+README.md
+docs/
+*.md
+
+# CI/CD
+.github/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+
+# SSH keys and certificates
+ssh_host_key
+ssh_host_key.pub
+certs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Build artifacts
+vendor/
+
+# Log files
+*.log
