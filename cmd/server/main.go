@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ahmadrosid/tunnel/internal/cert"
 	"github.com/ahmadrosid/tunnel/internal/config"
 	"github.com/ahmadrosid/tunnel/internal/proxy"
 	"github.com/ahmadrosid/tunnel/internal/tunnel"
@@ -25,8 +26,11 @@ func main() {
 	// Create tunnel registry
 	registry := tunnel.NewRegistry()
 
-	// Create WebSocket server
-	wsServer := websocket.NewServer(cfg, registry)
+	// Create certificate manager for TLS
+	certManager := cert.NewManager(cfg)
+
+	// Create WebSocket server with cert manager for TLS support
+	wsServer := websocket.NewServer(cfg, registry, certManager)
 
 	// Create HTTP/HTTPS proxy server
 	proxyServer := proxy.NewServer(cfg, registry)

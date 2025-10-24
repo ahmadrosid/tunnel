@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
@@ -36,16 +37,20 @@ var upgrader = websocket.Upgrader{
 
 // Server represents the WebSocket server
 type Server struct {
-	config   *config.Config
-	registry *tunnel.Registry
-	server   *http.Server
+	config      *config.Config
+	registry    *tunnel.Registry
+	server      *http.Server
+	certManager interface {
+		GetTLSConfig() *tls.Config
+	}
 }
 
 // NewServer creates a new WebSocket server
-func NewServer(cfg *config.Config, registry *tunnel.Registry) *Server {
+func NewServer(cfg *config.Config, registry *tunnel.Registry, certManager interface{ GetTLSConfig() *tls.Config }) *Server {
 	s := &Server{
-		config:   cfg,
-		registry: registry,
+		config:      cfg,
+		registry:    registry,
+		certManager: certManager,
 	}
 
 	mux := http.NewServeMux()
@@ -59,12 +64,23 @@ func NewServer(cfg *config.Config, registry *tunnel.Registry) *Server {
 		WriteTimeout: 15 * time.Second,
 	}
 
+	// Add TLS config if HTTPS is enabled
+	if cfg.EnableHTTPS && certManager != nil {
+		s.server.TLSConfig = certManager.GetTLSConfig()
+	}
+
 	return s
 }
 
 // Start starts the WebSocket server
 func (s *Server) Start() error {
-	log.Printf("WebSocket server listening on port %d", s.config.WebSocketPort)
+	// If WebSocket is on HTTPS port and HTTPS is enabled, use TLS
+	if s.config.EnableHTTPS && s.config.WebSocketPort == s.config.HTTPSPort && s.certManager != nil {
+		log.Printf("WebSocket server (WSS) listening on port %d", s.config.WebSocketPort)
+		return s.server.ListenAndServeTLS("", "")
+	}
+
+	log.Printf("WebSocket server (WS) listening on port %d", s.config.WebSocketPort)
 	return s.server.ListenAndServe()
 }
 
