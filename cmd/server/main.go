@@ -29,44 +29,71 @@ func main() {
 	// Create certificate manager for TLS
 	certManager := cert.NewManager(cfg)
 
-	// Create WebSocket server with cert manager for TLS support
-	wsServer := websocket.NewServer(cfg, registry, certManager)
+	// Check if WebSocket and HTTPS are on the same port
+	if cfg.WebSocketPort == cfg.HTTPSPort && cfg.EnableHTTPS {
+		log.Printf("WebSocket and HTTPS sharing port %d - using combined server", cfg.HTTPSPort)
 
-	// Create HTTP/HTTPS proxy server
-	proxyServer := proxy.NewServer(cfg, registry)
+		// Create combined server that handles both WebSocket and proxy on same port
+		combinedServer := websocket.NewCombinedServer(cfg, registry, certManager)
 
-	// Handle graceful shutdown
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		// Handle graceful shutdown
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
-	// Start proxy server in a goroutine
-	go func() {
-		if err := proxyServer.Start(); err != nil {
-			log.Fatalf("Proxy server error: %v", err)
+		// Start combined server
+		go func() {
+			if err := combinedServer.Start(); err != nil {
+				log.Fatalf("Combined server error: %v", err)
+			}
+		}()
+
+		// Wait for shutdown signal
+		<-sigChan
+		log.Println("\nShutting down server...")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := combinedServer.Shutdown(ctx); err != nil {
+			log.Printf("Error during shutdown: %v", err)
 		}
-	}()
+	} else {
+		// Run separate servers on different ports
+		wsServer := websocket.NewServer(cfg, registry, certManager)
+		proxyServer := proxy.NewServer(cfg, registry)
 
-	// Start WebSocket server in a goroutine
-	go func() {
-		if err := wsServer.Start(); err != nil {
-			log.Fatalf("WebSocket server error: %v", err)
+		// Handle graceful shutdown
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+		// Start proxy server in a goroutine
+		go func() {
+			if err := proxyServer.Start(); err != nil {
+				log.Fatalf("Proxy server error: %v", err)
+			}
+		}()
+
+		// Start WebSocket server in a goroutine
+		go func() {
+			if err := wsServer.Start(); err != nil {
+				log.Fatalf("WebSocket server error: %v", err)
+			}
+		}()
+
+		// Wait for shutdown signal
+		<-sigChan
+		log.Println("\nShutting down server...")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err := proxyServer.Shutdown(ctx); err != nil {
+			log.Printf("Error during proxy shutdown: %v", err)
 		}
-	}()
 
-	// Wait for shutdown signal
-	<-sigChan
-	log.Println("\nShutting down server...")
-
-	// Graceful shutdown with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if err := proxyServer.Shutdown(ctx); err != nil {
-		log.Printf("Error during proxy shutdown: %v", err)
-	}
-
-	if err := wsServer.Shutdown(); err != nil {
-		log.Printf("Error during WebSocket shutdown: %v", err)
+		if err := wsServer.Shutdown(); err != nil {
+			log.Printf("Error during WebSocket shutdown: %v", err)
+		}
 	}
 
 	log.Println("Server stopped")
