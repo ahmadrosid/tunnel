@@ -2,11 +2,14 @@ version: '3.8'
 
 # Production docker-compose configuration
 # Usage: docker-compose -f docker-compose.prod.yml up -d
+# Make sure to create a .env file with required variables (see .env.example)
 
 services:
   tunnel-server:
     image: ghcr.io/ahmadrosid/tunnel:latest
     container_name: tunnel-server-prod
+    env_file:
+      - .env
     ports:
       - "2222:2222"
       - "80:80"
