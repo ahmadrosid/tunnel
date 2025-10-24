@@ -9,29 +9,66 @@ WebSocket-based tunnel clients for exposing your local web server to the interne
 ```bash
 cd client
 npm install
+
+# Optional: Copy and customize .env file
+cp .env.example .env
+```
+
+### Configuration
+
+You can configure the client in three ways (in order of priority):
+
+1. **Command-line arguments** (highest priority)
+2. **Environment variables** from `.env` file
+3. **Default values** (lowest priority)
+
+#### Using .env file (Recommended)
+
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit .env with your settings
+nano .env
+```
+
+Example `.env`:
+```env
+TUNNEL_SERVER=ws://your-domain.com:8080/tunnel
+SUBDOMAIN=myapp
+LOCAL_PORT=3000
+LOCAL_HOST=localhost
 ```
 
 ### Usage
 
 ```bash
-# With custom subdomain
+# With .env file (uses values from .env)
+node client.js
+
+# With custom subdomain (overrides .env)
 node client.js myapp 3000
 
 # With random subdomain
 node client.js - 3000
 
-# Custom server
+# With environment variable (overrides .env for this run)
 TUNNEL_SERVER=ws://your-domain.com:8080/tunnel node client.js myapp 3000
 ```
 
 ### Arguments
 
-- `subdomain` - Your desired subdomain (use `-` for random)
-- `local-port` - Port where your local server is running (default: 3000)
+- `subdomain` - Your desired subdomain (use `-` for random, empty for value from .env)
+- `local-port` - Port where your local server is running (default: from .env or 3000)
 
 ### Environment Variables
 
+All variables can be set in `.env` file or as environment variables:
+
 - `TUNNEL_SERVER` - Tunnel server WebSocket URL (default: `ws://localhost:8080/tunnel`)
+- `SUBDOMAIN` - Default subdomain (default: empty/random)
+- `LOCAL_PORT` - Local server port (default: `3000`)
+- `LOCAL_HOST` - Local server host (default: `localhost`)
 
 ### Example
 
