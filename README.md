@@ -163,41 +163,6 @@ export ENABLE_HTTPS=true
 
 Or copy `.env.example` to `.env` and modify as needed.
 
-## Current Status - Step 2 In Progress 🚧
-
-### What Works
-- ✅ SSH server accepting anonymous connections
-- ✅ Subdomain allocation (random and custom)
-- ✅ Tunnel registration and tracking
-- ✅ HTTP/HTTPS reverse proxy infrastructure
-- ✅ Automatic Let's Encrypt certificates
-- ✅ Error handling (404, 502)
-- ✅ Connection management with timeouts
-- ✅ Minimal logging
-
-### Known Limitation - SSH Protocol Challenge
-
-The current implementation has a technical limitation with standard OpenSSH clients. When using `ssh -R`, the OpenSSH client restricts which channels the server can open back to the client. This prevents the HTTP proxy from forwarding traffic through the SSH tunnel using the standard `forwarded-tcpip` channel type.
-
-**Technical Details:**
-- Standard SSH reverse port forwarding (`-R`) is designed for the CLIENT to accept connections and forward them
-- Our serveo-style architecture requires the SERVER to push connections to the client
-- OpenSSH client rejects `forwarded-tcpip` channels that don't match explicitly requested forwards
-
-**Possible Solutions** (for future implementation):
-1. **Custom SSH Client**: Build a client that accepts server-initiated forwarded-tcpip channels
-2. **SOCKS Proxy**: Use SOCKS5 dynamic port forwarding instead of reverse forwarding
-3. **Custom Protocol**: Implement a custom protocol over SSH channels
-4. **Direct TCP Tunneling**: Use direct-tcpip with proper permission configuration
-
-### What's Next
-- 🔧 Resolve SSH forwarding limitation (high priority)
-- WebSocket support
-- Connection statistics and monitoring
-- Rate limiting
-- Authentication options
-- Web dashboard
-
 ## Architecture
 
 ```
