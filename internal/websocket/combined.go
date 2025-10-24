@@ -51,11 +51,15 @@ func NewCombinedServer(cfg *config.Config, registry *tunnel.Registry, certManage
 	// All other requests go to the proxy
 	mux.HandleFunc("/", cs.handleProxyOrWebSocket)
 
+	// Get TLS config and disable HTTP/2 (required for connection hijacking)
+	tlsConfig := certManager.GetTLSConfig()
+	tlsConfig.NextProtos = []string{"http/1.1"} // Force HTTP/1.1, disable HTTP/2
+
 	// HTTPS server on 443
 	cs.server = &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.HTTPSPort),
 		Handler:      mux,
-		TLSConfig:    certManager.GetTLSConfig(),
+		TLSConfig:    tlsConfig,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 	}
